@@ -12,22 +12,26 @@ import ot
 # method: choice of algorithm for transport computation (default: emd)
 
 
-def jdot_nn_l2(
-    get_model,
-    X,
-    Y,
-    Xtest,
-    ytest=[],
-    fit_params={},
-    reset_model=True,
-    numIterBCD=10,
-    alpha=1,
-    method="emd",
-    reg=1,
-    nb_epoch=100,
-    batch_size=10,
-):
-    # get model should return a new model compiled with l2 loss
+def jdot_nn_l2(get_model, X, Y, Xtest, ytest=[], fit_params={}, reset_model=True, numIterBCD=10, alpha=1, method="emd", reg=1, nb_epoch=100, batch_size=10):
+    """
+    JDOT with neural network and l2 loss
+
+    Args:
+        get_model (Callable): Function that returns a new model compiled with l2 loss
+        X (list): Data from source domain
+        Y (list): Labels from source domain
+        Xtest (list): Data from target domain
+        ytest (list, optional): Labels from target domain. Defaults to [].
+        fit_params (dict, optional): _description_. Defaults to {}.
+        reset_model (bool, optional): Boolean to reset the model at each iteration. Defaults to True.
+        numIterBCD (int, optional): Number of Iterations for BCD. Defaults to 10.
+        alpha (int, optional): Ponderation between ground cost + function cost. Defaults to 1.
+        method (str, optional): Choice of algorithm for transport computation. Defaults to "emd".
+        reg (int, optional): Parameter for sinkhorn. Defaults to 1.
+
+    Returns:
+        model, results: Returns the model and the results
+    """
 
     # Initializations
     n = X.shape[0]
@@ -37,10 +41,10 @@ def jdot_nn_l2(
 
     # original loss
     C0 = cdist(X, Xtest, metric="sqeuclidean")
-    C0 = C0 / np.max(C0)
+    C0 /= np.max(C0)
 
     # classifier
-    g = get_model()
+    model = get_model()
 
     TBR = []
     sav_fcost = []
@@ -49,8 +53,8 @@ def jdot_nn_l2(
     results = {}
 
     # Init initial g(.)
-    g.fit(X, Y, **fit_params)
-    ypred = g.predict(Xtest)
+    model.fit(X, Y, **fit_params)
+    ypred = model.predict(Xtest)
 
     C = alpha * C0 + cdist(Y, ypred, metric="sqeuclidean")
 
@@ -70,10 +74,10 @@ def jdot_nn_l2(
 
         Yst = ntest * G.T.dot(Y)
         if reset_model:
-            g = get_model()
+            model = get_model()
 
-        g.fit(Xtest, Yst, **fit_params)
-        ypred = g.predict(Xtest)
+        model.fit(Xtest, Yst, **fit_params)
+        ypred = model.predict(Xtest)
 
         # function cost
         fcost = cdist(Y, ypred, metric="sqeuclidean")
@@ -93,7 +97,7 @@ def jdot_nn_l2(
     results["ypred"] = np.argmax(ypred, 1) + 1
     if len(ytest):
         results["mse"] = TBR
-    results["clf"] = g
+    results["clf"] = model
     results["fcost"] = sav_fcost
     results["totalcost"] = sav_totalcost
-    return g, results
+    return model, results
