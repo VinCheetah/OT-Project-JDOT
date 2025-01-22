@@ -12,74 +12,88 @@ import ot
 # method: choice of algorithm for transport computation (default: emd)
 
 
-def jdot_nn_l2(get_model,X,Y,Xtest,ytest=[],fit_params={},reset_model=True, numIterBCD = 10, alpha=1,method='emd',reg=1,nb_epoch=100,batch_size=10):
-	# get model should return a new model compiled with l2 loss
+def jdot_nn_l2(
+    get_model,
+    X,
+    Y,
+    Xtest,
+    ytest=[],
+    fit_params={},
+    reset_model=True,
+    numIterBCD=10,
+    alpha=1,
+    method="emd",
+    reg=1,
+    nb_epoch=100,
+    batch_size=10,
+):
+    # get model should return a new model compiled with l2 loss
 
-	# Initializations
-	n = X.shape[0]
-	ntest = Xtest.shape[0]
-	wa=np.ones((n,))/n
-	wb=np.ones((ntest,))/ntest
+    # Initializations
+    n = X.shape[0]
+    ntest = Xtest.shape[0]
+    wa = np.ones((n,)) / n
+    wb = np.ones((ntest,)) / ntest
 
-	# original loss
-	C0=cdist(X,Xtest,metric='sqeuclidean')
-	C0=C0/np.max(C0)
+    # original loss
+    C0 = cdist(X, Xtest, metric="sqeuclidean")
+    C0 = C0 / np.max(C0)
 
-	# classifier
-	g = get_model()
-		
-	TBR = []
-	sav_fcost = []
-	sav_totalcost = []
+    # classifier
+    g = get_model()
 
-	results = {}
+    TBR = []
+    sav_fcost = []
+    sav_totalcost = []
 
-	#Init initial g(.)
-	g.fit(X,Y,**fit_params)
-	ypred=g.predict(Xtest)
+    results = {}
 
-	C = alpha*C0+ cdist(Y,ypred,metric='sqeuclidean')
+    # Init initial g(.)
+    g.fit(X, Y, **fit_params)
+    ypred = g.predict(Xtest)
 
-	# do it only if the final labels were given
-	if len(ytest):
-		ydec=np.argmax(ypred,1)+1
-		TBR1=np.mean(ytest==ydec)
-		TBR.append(TBR1)
+    C = alpha * C0 + cdist(Y, ypred, metric="sqeuclidean")
 
-	k=0
-	while (k<numIterBCD):# and not changeLabels:
-		k = k + 1
-		if method == 'sinkhorn':
-			G = ot.sinkhorn(wa,wb,C,reg)
-		if method == 'emd':
-			G = ot.emd(wa,wb,C)
+    # do it only if the final labels were given
+    if len(ytest):
+        ydec = np.argmax(ypred, 1) + 1
+        TBR1 = np.mean(ytest == ydec)
+        TBR.append(TBR1)
 
-		Yst = ntest*G.T.dot(Y)
-		if reset_model:
-			g = get_model()
+    k = 0
+    while k < numIterBCD:  # and not changeLabels:
+        k = k + 1
+        if method == "sinkhorn":
+            G = ot.sinkhorn(wa, wb, C, reg)
+        if method == "emd":
+            G = ot.emd(wa, wb, C)
 
-		g.fit(Xtest,Yst,**fit_params)
-		ypred=g.predict(Xtest)
-		
-		# function cost
-		fcost = cdist(Y,ypred,metric='sqeuclidean')
-		C = alpha * C0 + fcost
+        Yst = ntest * G.T.dot(Y)
+        if reset_model:
+            g = get_model()
 
-		ydec_tmp = np.argmax(ypred, 1) + 1
-		if k > 1:
-			sav_fcost.append(np.sum(G * fcost))
-			sav_totalcost.append(np.sum(G * (alpha * C0 + fcost)))
+        g.fit(Xtest, Yst, **fit_params)
+        ypred = g.predict(Xtest)
 
-		ydec=ydec_tmp
-		if len(ytest):
-			TBR1=np.mean((ytest-ypred)**2)
-			TBR.append(TBR1)
-			
-	results['ypred0']=ypred
-	results['ypred']=np.argmax(ypred,1)+1
-	if len(ytest):
-		results['mse']=TBR
-	results['clf']=g
-	results['fcost']=sav_fcost
-	results['totalcost']=sav_totalcost
-	return g,results
+        # function cost
+        fcost = cdist(Y, ypred, metric="sqeuclidean")
+        C = alpha * C0 + fcost
+
+        ydec_tmp = np.argmax(ypred, 1) + 1
+        if k > 1:
+            sav_fcost.append(np.sum(G * fcost))
+            sav_totalcost.append(np.sum(G * (alpha * C0 + fcost)))
+
+        ydec = ydec_tmp
+        if len(ytest):
+            TBR1 = np.mean((ytest - ypred) ** 2)
+            TBR.append(TBR1)
+
+    results["ypred0"] = ypred
+    results["ypred"] = np.argmax(ypred, 1) + 1
+    if len(ytest):
+        results["mse"] = TBR
+    results["clf"] = g
+    results["fcost"] = sav_fcost
+    results["totalcost"] = sav_totalcost
+    return g, results
