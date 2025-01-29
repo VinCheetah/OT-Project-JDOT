@@ -17,15 +17,15 @@ class Model(torch.nn.Module):
 		self.criterion = torch.nn.MSELoss()
 		self.optimizer = torch.optim.Adam(self.model.parameters(), lr=0.001)
 
-	def fit(self, X, Y):
+	def fit(self, X, y):
 		# fit the model
-		for epoch in range(self.num_epochs):
+		y = torch.nn.functional.one_hot(y, num_classes=10).float()
+		for epoch in range(self.n_epochs):
 			self.model.train()
-			X, Y = X.to(self.device), Y.to(self.device)
-			Y = torch.nn.functional.one_hot(Y, num_classes=10).float()
+			X, y = X.to(self.device), y.to(self.device)
 			self.optimizer.zero_grad()
 			output = self.model(X)
-			loss = self.criterion(output, Y)
+			loss = self.criterion(output, y)
 			loss.backward()
 			self.optimizer.step()
 
@@ -34,7 +34,7 @@ class Model(torch.nn.Module):
 		self.model.eval()
 		X = X.to(self.device)
 		output = self.model(X)
-		_, predicted = torch.max(output)
+		_, predicted = torch.max(output, dim=1)
 		return predicted
 
 

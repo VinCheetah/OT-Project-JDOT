@@ -1,7 +1,7 @@
 import numpy as np
 from scipy.spatial.distance import cdist
 import ot
-
+import torch
 
 def jdot_nn_l2(get_model, X, Y, Xtest, ytest=[], reset_model=True, numIterBCD=10, alpha=1, method="emd", reg=1, n_epochs=100):
 	"""
@@ -35,7 +35,7 @@ def jdot_nn_l2(get_model, X, Y, Xtest, ytest=[], reset_model=True, numIterBCD=10
 	C0 /= np.max(C0)
 
 	# classifier
-	model = get_model()
+	model = get_model(n_epochs)
 
 	TBR = []
 	sav_fcost = []
@@ -51,8 +51,10 @@ def jdot_nn_l2(get_model, X, Y, Xtest, ytest=[], reset_model=True, numIterBCD=10
 
 	# do it only if the final labels were given
 	if len(ytest):
-		ydec = np.argmax(ypred, 1) + 1
-		TBR.append(np.mean(ytest == ydec))
+		# ydec = np.argmax(ypred, 1) + 1
+		# TBR.append(np.mean(ytest == ydec))
+		TBR.append((torch.argmax(ytest, axis=1) == torch.argmax(ypred, axis=1)).float().mean())
+
 
 	for num_iter in range(numIterBCD):
 		# match method:
@@ -69,24 +71,25 @@ def jdot_nn_l2(get_model, X, Y, Xtest, ytest=[], reset_model=True, numIterBCD=10
 		else:
 			raise ValueError("Method not implemented")
 
-		Yst = ntest * G.T.dot(Y)
+		Yst = torch.tensor(ntest * G.T.dot(Y)).float()
+		print(Yst.shape)
 		if reset_model:
-			model = get_model()
+			model = get_model(n_epochs)
 
-		model.fit(Xtest, Yst, **fit_params)
+		model.fit(Xtest, Yst)
 		ypred = model.predict(Xtest)
 
 		# function cost
 		fcost = cdist(Y, ypred, metric="sqeuclidean")
 		C = alpha * C0 + fcost
 
-		ydec = np.argmax(ypred, 1) + 1
 		if num_iter > 1:
 			sav_fcost.append(np.sum(G * fcost))
 			sav_totalcost.append(np.sum(G * (alpha * C0 + fcost)))
 
 		if len(ytest):
-			TBR.append(np.mean((ytest - ypred) ** 2))
+			# TBR.append(np.mean((ytest - ypred) ** 2))
+			TBR.append((torch.argmax(ytest, axis=1) == torch.argmax(ypred, axis=1)).float().mean())
 
 	results = {
 		"ypred0": ypred,
